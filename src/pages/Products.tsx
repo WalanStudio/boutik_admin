@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Plus, Search, X, Pencil, Package,
   ChevronDown, ChevronUp, Truck, AlertTriangle, Check,
@@ -226,7 +226,7 @@ function ProductRow({
         {/* Info */}
         <div className="flex-1 min-w-0">
           <p className="text-[14px] font-bold text-dark truncate">{product.name}</p>
-          <p className="text-[12px] text-slate-400 font-medium">{product.category_name} · {product.packaging}</p>
+          <p className="text-[12px] text-slate-400 font-medium">{product.packaging}</p>
           {product.supplier_name && (
             <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
               <Truck className="w-3 h-3" />{product.supplier_name}
@@ -277,6 +277,43 @@ function ProductRow({
   );
 }
 
+// ── Section catégorie (repliable) ─────────────────────────────────────────────
+function CategorySection({
+  name, products, open, onToggleOpen, children,
+}: {
+  name: string;
+  products: AdminProduct[];
+  open: boolean;
+  onToggleOpen: () => void;
+  children: React.ReactNode;
+}) {
+  const ruptures = products.filter(p => p.stock_qty === 0 && p.is_active).length;
+
+  return (
+    <section>
+      <button
+        onClick={onToggleOpen}
+        className="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-slate-100 transition-colors sticky top-0 z-10"
+      >
+        {open
+          ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" />
+          : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
+        <h2 className="text-[14px] font-extrabold text-dark truncate">{name}</h2>
+        <span className="px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-[11px] font-bold text-slate-500 shrink-0">
+          {products.length}
+        </span>
+        {ruptures > 0 && (
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-50 text-[11px] font-bold text-red-600 shrink-0">
+            <AlertTriangle className="w-3 h-3" />
+            {ruptures} en rupture
+          </span>
+        )}
+      </button>
+      {open && <div className="space-y-2 mt-2 mb-5">{children}</div>}
+    </section>
+  );
+}
+
 // ── Page principale ───────────────────────────────────────────────────────────
 export default function Products() {
   const [products, setProducts]       = useState<AdminProduct[]>([]);
@@ -284,7 +321,8 @@ export default function Products() {
   const [suppliers, setSuppliers]     = useState<Supplier[]>([]);
   const [loading, setLoading]         = useState(true);
   const [search, setSearch]           = useState("");
-  const [catFilter, setCatFilter]     = useState<number | "">("");
+  const [catFilter, setCatFilter]     = useState<string>("");
+  const [closed, setClosed]           = useState<Set<string>>(new Set());
   const [showModal, setShowModal]     = useState<"create" | "edit" | "stock" | null>(null);
   const [selected, setSelected]       = useState<AdminProduct | null>(null);
   const [error, setError]             = useState("");
@@ -309,9 +347,29 @@ export default function Products() {
 
   const filtered = products.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchCat    = catFilter === "" || p.category_id === catFilter;
+    const matchCat    = catFilter === "" || p.category_slug === catFilter;
     return matchSearch && matchCat;
   });
+
+  // Regroupement par catégorie, dans l'ordre d'affichage des catégories (sort_order)
+  const groups = useMemo(() => {
+    const byCat = new Map<string, AdminProduct[]>();
+    for (const p of filtered) {
+      const list = byCat.get(p.category_slug);
+      if (list) list.push(p);
+      else byCat.set(p.category_slug, [p]);
+    }
+    const ordered = categories
+      .filter(c => byCat.has(c.slug))
+      .map(c => ({ slug: c.slug, name: c.name, items: byCat.get(c.slug)! }));
+
+    // Catégories présentes sur un produit mais absentes de la table (sécurité)
+    const known = new Set(categories.map(c => c.slug));
+    for (const [slug, items] of byCat) {
+      if (!known.has(slug)) ordered.push({ slug, name: items[0].category_name, items });
+    }
+    return ordered;
+  }, [filtered, categories]);
 
   const handleToggle = async (p: AdminProduct) => {
     await updateProduct(p.id, { is_active: !p.is_active });
@@ -322,7 +380,7 @@ export default function Products() {
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
       <PageHeader
         title="Produits"
-        subtitle={`${products.length} produit${products.length !== 1 ? "s" : ""}`}
+        subtitle={`${products.length} produit${products.length !== 1 ? "s" : ""} · ${groups.length} catégorie${groups.length !== 1 ? "s" : ""}`}
         action={
           <button
             onClick={() => { setSelected(null); setShowModal("create"); }}
@@ -341,10 +399,16 @@ export default function Products() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…" className="flex-1 bg-transparent text-[13px] placeholder-slate-300 focus:outline-none" />
           {search && <button onClick={() => setSearch("")}><X className="w-3.5 h-3.5 text-slate-300" /></button>}
         </div>
-        <select value={catFilter} onChange={e => setCatFilter(e.target.value !== "" ? +e.target.value : "")} className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-600 focus:outline-none">
+        <select value={catFilter} onChange={e => setCatFilter(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-600 focus:outline-none">
           <option value="">Toutes catégories</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
         </select>
+        <button
+          onClick={() => setClosed(c => (c.size > 0 ? new Set() : new Set(groups.map(g => g.slug))))}
+          className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[13px] font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+        >
+          {closed.size > 0 ? "Tout déplier" : "Tout replier"}
+        </button>
       </div>
 
       {loading ? (
@@ -354,14 +418,29 @@ export default function Products() {
       ) : error ? (
         <p className="text-red-500 font-semibold p-4">{error}</p>
       ) : (
-        <div className="space-y-2">
-          {filtered.map(p => (
-            <ProductRow
-              key={p.id} product={p} suppliers={suppliers}
-              onEdit={p => { setSelected(p); setShowModal("edit"); }}
-              onStock={p => { setSelected(p); setShowModal("stock"); }}
-              onToggle={handleToggle}
-            />
+        <div>
+          {groups.map(g => (
+            <CategorySection
+              key={g.slug}
+              name={g.name}
+              products={g.items}
+              open={!closed.has(g.slug)}
+              onToggleOpen={() => setClosed(prev => {
+                const next = new Set(prev);
+                if (next.has(g.slug)) next.delete(g.slug);
+                else next.add(g.slug);
+                return next;
+              })}
+            >
+              {g.items.map(p => (
+                <ProductRow
+                  key={p.id} product={p} suppliers={suppliers}
+                  onEdit={p => { setSelected(p); setShowModal("edit"); }}
+                  onStock={p => { setSelected(p); setShowModal("stock"); }}
+                  onToggle={handleToggle}
+                />
+              ))}
+            </CategorySection>
           ))}
           {filtered.length === 0 && (
             <div className="flex flex-col items-center py-16 text-slate-300">
