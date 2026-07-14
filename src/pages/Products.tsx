@@ -67,13 +67,25 @@ function ProductForm({
 
   const set = (k: string, v: string | number | boolean) => setForm(f => ({ ...f, [k]: v }));
 
+  const buildUpdatePayload = () => {
+    if (!initial) return form;
+    const payload: Partial<typeof form> = {};
+    let k: keyof typeof form;
+    for (k in form) {
+      const current = form[k];
+      const original = initial[k];
+      if (current !== original) payload[k] = current;
+    }
+    return payload;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError("");
     try {
       if (initial) {
-        await updateProduct(initial.id, form);
+        await updateProduct(initial.id, buildUpdatePayload());
       } else {
         await createProduct(form);
       }
