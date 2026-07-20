@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ShoppingCart, Package, Truck, Store,
-  LogOut, Menu, X, ChevronRight, ShoppingBag,
+  LogOut, Menu, X, ChevronRight, ShoppingBag, Layers, Ticket,
 } from "lucide-react";
 import { adminSignOut } from "../lib/db";
 
@@ -10,6 +10,8 @@ const NAV = [
   { to: "/",           label: "Tableau de bord", icon: LayoutDashboard },
   { to: "/orders",     label: "Commandes",        icon: ShoppingCart },
   { to: "/products",   label: "Produits",          icon: Package },
+  { to: "/categories", label: "Catégories",        icon: Layers },
+  { to: "/promotions", label: "Promotions",        icon: Ticket },
   { to: "/suppliers",  label: "Fournisseurs",      icon: Truck },
   { to: "/shops",      label: "Boutiques",         icon: Store },
 ];

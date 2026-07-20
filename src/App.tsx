@@ -7,6 +7,8 @@ import Login     from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Orders    from "./pages/Orders";
 import Products  from "./pages/Products";
+import Categories from "./pages/Categories";
+import Promotions from "./pages/Promotions";
 import Suppliers from "./pages/Suppliers";
 import Shops     from "./pages/Shops";
 
@@ -92,6 +94,8 @@ export default function App() {
               <Route path="/"          element={<Dashboard />} />
               <Route path="/orders"    element={<Orders />} />
               <Route path="/products"  element={<Products />} />
+              <Route path="/categories" element={<Categories />} />
+              <Route path="/promotions" element={<Promotions />} />
               <Route path="/suppliers" element={<Suppliers />} />
               <Route path="/shops"     element={<Shops />} />
               <Route path="*"          element={<Navigate to="/" replace />} />

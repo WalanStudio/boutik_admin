@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import type {
   AdminOrder, AdminProduct, Category, Supplier,
-  Shop, DashboardStats, OrderStatus,
+  Shop, DashboardStats, OrderStatus, PromoCode,
 } from "./supabase";
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -122,8 +122,46 @@ export async function createCategory(c: { name: string; slug: string; sort_order
   if (error) throw new Error(error.message);
 }
 
-export async function updateCategory(id: number, c: Partial<{ name: string; slug: string; sort_order: number }>): Promise<void> {
+export async function updateCategory(id: number, c: Partial<{ name: string; slug: string; sort_order: number; icon_url: string | null }>): Promise<void> {
   const { error } = await supabase.from("categories").update(c).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// ── Codes promo ──────────────────────────────────────────────────────────────
+
+export async function getPromoCodes(): Promise<PromoCode[]> {
+  const { data, error } = await supabase
+    .from("promo_codes")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as PromoCode[];
+}
+
+type PromoInput = {
+  code:           string;
+  description:    string | null;
+  discount_type:  PromoCode["discount_type"];
+  discount_value: number;
+  min_order_fcfa: number;
+  max_uses:       number | null;
+  starts_at:      string | null;
+  expires_at:     string | null;
+  is_active:      boolean;
+};
+
+export async function createPromoCode(p: PromoInput): Promise<void> {
+  const { error } = await supabase.from("promo_codes").insert(p);
+  if (error) throw new Error(error.message);
+}
+
+export async function updatePromoCode(id: number, p: Partial<PromoInput>): Promise<void> {
+  const { error } = await supabase.from("promo_codes").update(p).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deletePromoCode(id: number): Promise<void> {
+  const { error } = await supabase.from("promo_codes").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
 
