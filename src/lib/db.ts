@@ -127,6 +127,32 @@ export async function updateCategory(id: number, c: Partial<{ name: string; slug
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Nombre de produits par catégorie, indexé par category_id.
+ * Sert à empêcher la suppression d'une catégorie non vide : products.category_id
+ * est `on delete restrict`, la base refuserait avec une erreur peu lisible.
+ */
+export async function getCategoryProductCounts(): Promise<Record<number, number>> {
+  const { data, error } = await supabase.from("products").select("category_id");
+  if (error) throw new Error(error.message);
+  const counts: Record<number, number> = {};
+  (data ?? []).forEach((row: { category_id: number }) => {
+    counts[row.category_id] = (counts[row.category_id] ?? 0) + 1;
+  });
+  return counts;
+}
+
+export async function deleteCategory(id: number): Promise<void> {
+  const { error } = await supabase.from("categories").delete().eq("id", id);
+  if (error) {
+    // 23503 = violation de clé étrangère : des produits pointent encore dessus.
+    if (error.code === "23503") {
+      throw new Error("Cette catégorie contient encore des produits. Déplacez-les avant de la supprimer.");
+    }
+    throw new Error(error.message);
+  }
+}
+
 // ── Codes promo ──────────────────────────────────────────────────────────────
 
 export async function getPromoCodes(): Promise<PromoCode[]> {

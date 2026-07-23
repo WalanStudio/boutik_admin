@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Plus, Pencil, X, Package, GripVertical } from "lucide-react";
-import { getCategories, createCategory, updateCategory } from "../lib/db";
+import { Plus, Pencil, X, Package, GripVertical, Trash2, AlertTriangle } from "lucide-react";
+import { getCategories, createCategory, updateCategory, deleteCategory, getCategoryProductCounts } from "../lib/db";
 import type { Category } from "../lib/supabase";
 import { PageHeader } from "../components/Layout";
 
@@ -116,16 +116,91 @@ function CategoryForm({ initial, existing, onSave, onClose }: {
   );
 }
 
+/**
+ * Confirmation de suppression. Une catégorie qui contient encore des produits
+ * n'est pas supprimable (contrainte `on delete restrict` en base) : on l'explique
+ * plutôt que de laisser partir une requête vouée à échouer.
+ */
+function DeleteConfirm({ category, productCount, onDeleted, onClose }: {
+  category: Category;
+  productCount: number;
+  onDeleted: () => void;
+  onClose: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError]       = useState("");
+  const blocked = productCount > 0;
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setError("");
+    try {
+      await deleteCategory(category.id);
+      onDeleted();
+      onClose();
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-3">
+        <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center ${blocked ? "bg-amber-50 text-amber-500" : "bg-red-50 text-red-500"}`}>
+          <AlertTriangle className="w-5 h-5" />
+        </div>
+        <div className="text-[14px] text-slate-600 leading-relaxed">
+          {blocked ? (
+            <>
+              <span className="font-bold text-dark">{category.name}</span> contient{" "}
+              <span className="font-bold text-dark">{productCount} produit{productCount > 1 ? "s" : ""}</span>.
+              Une catégorie non vide ne peut pas être supprimée : déplacez d'abord ces produits
+              vers une autre catégorie depuis la page <span className="font-semibold text-dark">Produits</span>.
+            </>
+          ) : (
+            <>
+              Supprimer définitivement la catégorie <span className="font-bold text-dark">{category.name}</span> ?
+              Cette action est irréversible.
+            </>
+          )}
+        </div>
+      </div>
+      {error && <p className="text-[13px] text-red-500 font-semibold">{error}</p>}
+      <div className="flex gap-3 pt-2">
+        <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-slate-200 text-[14px] font-bold text-slate-500 hover:bg-slate-50 transition-all">
+          {blocked ? "Fermer" : "Annuler"}
+        </button>
+        {!blocked && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="flex-1 py-3 rounded-xl bg-red-500 text-white text-[14px] font-bold hover:bg-red-600 transition-all disabled:opacity-60"
+          >
+            {deleting ? "Suppression…" : "Supprimer"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [counts, setCounts]         = useState<Record<number, number>>({});
   const [loading, setLoading]       = useState(true);
-  const [modal, setModal]           = useState<"create" | "edit" | null>(null);
+  const [modal, setModal]           = useState<"create" | "edit" | "delete" | null>(null);
   const [selected, setSelected]     = useState<Category | null>(null);
   const [error, setError]           = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setCategories(await getCategories()); }
+    try {
+      const [cats, productCounts] = await Promise.all([getCategories(), getCategoryProductCounts()]);
+      setCategories(cats);
+      setCounts(productCounts);
+    }
     catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }, []);
@@ -169,6 +244,9 @@ export default function Categories() {
                 <p className="text-[12px] text-slate-400 font-medium">/{c.slug}</p>
               </div>
               <span className="text-[11px] font-bold text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg shrink-0">
+                {counts[c.id] ?? 0} produit{(counts[c.id] ?? 0) > 1 ? "s" : ""}
+              </span>
+              <span className="text-[11px] font-bold text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg shrink-0">
                 #{c.sort_order}
               </span>
               <button
@@ -177,6 +255,13 @@ export default function Categories() {
                 className="w-8 h-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition-colors shrink-0"
               >
                 <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => { setSelected(c); setModal("delete"); }}
+                title="Supprimer"
+                className="w-8 h-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors shrink-0"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
@@ -195,6 +280,17 @@ export default function Categories() {
             initial={modal === "edit" ? selected ?? undefined : undefined}
             existing={categories}
             onSave={load}
+            onClose={() => setModal(null)}
+          />
+        </Modal>
+      )}
+
+      {modal === "delete" && selected && (
+        <Modal title="Supprimer la catégorie" onClose={() => setModal(null)}>
+          <DeleteConfirm
+            category={selected}
+            productCount={counts[selected.id] ?? 0}
+            onDeleted={load}
             onClose={() => setModal(null)}
           />
         </Modal>
