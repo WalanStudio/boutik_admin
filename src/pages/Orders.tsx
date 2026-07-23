@@ -132,6 +132,29 @@ function OrderRow({
                   </div>
                 ))}
               </div>
+
+              {/* Décomposition du total : sans elle, l'écart entre la somme des
+                  produits et le total facturé serait inexplicable. */}
+              <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-slate-500 font-medium">Sous-total produits</span>
+                  <span className="text-slate-600 font-semibold">{fcfa(order.subtotal_fcfa)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-slate-500 font-medium">Frais de service</span>
+                  <span className="text-slate-600 font-semibold">
+                    {order.service_fee_fcfa === 0 ? "Offerts" : fcfa(order.service_fee_fcfa)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-slate-500 font-medium">Livraison</span>
+                  <span className="text-slate-600 font-semibold">{fcfa(order.delivery_fee_fcfa)}</span>
+                </div>
+                <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
+                  <span className="text-[14px] font-bold text-dark">Total</span>
+                  <span className="text-[15px] font-extrabold text-dark">{fcfa(order.total_fcfa)}</span>
+                </div>
+              </div>
             </div>
           )}
 

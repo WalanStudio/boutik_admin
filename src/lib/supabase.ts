@@ -148,6 +148,9 @@ export interface AdminOrder {
   payment_method:  PaymentMethod;
   delivery_date:   string;
   delivery_address: string | null;
+  subtotal_fcfa:     number;
+  service_fee_fcfa:  number;
+  delivery_fee_fcfa: number;
   total_fcfa:      number;
   notes:           string | null;
   created_at:      string;
