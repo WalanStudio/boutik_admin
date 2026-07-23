@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import type {
   AdminOrder, AdminProduct, Category, Supplier,
   Shop, DashboardStats, OrderStatus, PromoCode,
+  ProductPromotion, DiscountType,
 } from "./supabase";
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -188,6 +189,57 @@ export async function updatePromoCode(id: number, p: Partial<PromoInput>): Promi
 
 export async function deletePromoCode(id: number): Promise<void> {
   const { error } = await supabase.from("promo_codes").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// ── Promotions produit / catégorie ───────────────────────────────────────────
+
+export async function getProductPromotions(): Promise<ProductPromotion[]> {
+  const { data, error } = await supabase
+    .from("product_promotions")
+    .select("*, products(name), categories(name)")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ProductPromotion[];
+}
+
+type ProductPromotionInput = {
+  label:          string;
+  product_id:     number | null;
+  category_id:    number | null;
+  discount_type:  DiscountType;
+  discount_value: number;
+  starts_at:      string | null;
+  expires_at:     string | null;
+  is_active:      boolean;
+};
+
+/** Traduit les contraintes SQL en messages lisibles au back-office. */
+function promotionError(message: string): Error {
+  if (message.includes("product_promotions_one_target")) {
+    return new Error("Choisissez une cible : soit un produit, soit une catégorie.");
+  }
+  if (message.includes("product_promotions_pct_range")) {
+    return new Error("Un pourcentage de réduction ne peut pas dépasser 100 %.");
+  }
+  if (message.includes("discount_value")) {
+    return new Error("La valeur de réduction doit être supérieure à 0.");
+  }
+  return new Error(message);
+}
+
+export async function createProductPromotion(p: ProductPromotionInput): Promise<void> {
+  const { error } = await supabase.from("product_promotions").insert(p);
+  if (error) throw promotionError(error.message);
+}
+
+export async function updateProductPromotion(id: number, p: Partial<ProductPromotionInput>): Promise<void> {
+  const { error } = await supabase.from("product_promotions").update(p).eq("id", id);
+  if (error) throw promotionError(error.message);
+}
+
+export async function deleteProductPromotion(id: number): Promise<void> {
+  const { error } = await supabase.from("product_promotions").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
 

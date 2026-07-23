@@ -46,6 +46,27 @@ export interface PromoCode {
   updated_at:     string;
 }
 
+/**
+ * Remise automatique sur un produit OU une catégorie (pas de code à saisir).
+ * Exactement l'un de product_id / category_id est renseigné — contrainte en base.
+ */
+export interface ProductPromotion {
+  id:             number;
+  label:          string;
+  product_id:     number | null;
+  category_id:    number | null;
+  discount_type:  DiscountType;
+  discount_value: number;
+  starts_at:      string | null;
+  expires_at:     string | null;
+  is_active:      boolean;
+  created_at:     string;
+  updated_at:     string;
+  // Jointures ramenées pour l'affichage
+  products?:      { name: string } | null;
+  categories?:    { name: string } | null;
+}
+
 export interface Supplier {
   id:            number;
   name:          string;
